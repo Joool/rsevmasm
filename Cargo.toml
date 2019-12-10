@@ -10,7 +10,7 @@ A rust crate for disassembling EVM bytecode instructions.
 homepage = "https://github.com/Joool/rsevmasm"
 documentation = "https://github.com/Joool/rsevmasm"
 repository = "https://github.com/Joool/rsevmasm"
-keywords = ["program analysis", "evm", "ethereum", "disassembler"]
+keywords = ["program_analysis", "evm", "ethereum", "disassembler"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
