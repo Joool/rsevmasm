@@ -15,7 +15,7 @@
 pub mod instructions;
 
 use hex;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::Cursor;
 
 use instructions::disassemble_next_byte;
@@ -24,7 +24,7 @@ pub use instructions::Instruction;
 
 #[derive(Clone, Debug)]
 pub struct Disassembly {
-    pub instructions: HashMap<usize, Instruction>,
+    pub instructions: BTreeMap<usize, Instruction>,
 }
 
 impl Disassembly {
