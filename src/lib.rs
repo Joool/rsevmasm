@@ -27,6 +27,11 @@ pub struct Disassembly {
 }
 
 impl Disassembly {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let instructions = disassemble_bytes(bytes);
+        Self { instructions }
+    }
+
     pub fn from_hex_str(input: &str) -> Result<Self, hex::FromHexError> {
         let instructions = disassemble_hex_str(input)?;
         Ok(Self { instructions })
@@ -43,10 +48,10 @@ fn disassemble_hex_str(input: &str) -> Result<HashMap<usize, Instruction>, hex::
     } else {
         input
     };
-    hex::decode(input).map(disassemble_bytes)
+    hex::decode(input).map(|bytes| disassemble_bytes(&bytes))
 }
 
-fn disassemble_bytes(bytes: Vec<u8>) -> HashMap<usize, Instruction> {
+fn disassemble_bytes(bytes: &[u8]) -> HashMap<usize, Instruction> {
     let mut instructions = HashMap::new();
     let mut cursor = Cursor::new(bytes);
     while let Ok((offset, instruction)) = disassemble_next_byte(&mut cursor) {

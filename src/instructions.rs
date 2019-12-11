@@ -14,7 +14,7 @@
 
 use std::io::{Cursor, Error, Read};
 
-pub fn disassemble_next_byte(cursor: &mut Cursor<Vec<u8>>) -> Result<(usize, Instruction), Error> {
+pub fn disassemble_next_byte(cursor: &mut Cursor<&[u8]>) -> Result<(usize, Instruction), Error> {
     let offset = cursor.position() as usize;
     let opcode = read_n_bytes(cursor, 1)?[0];
     let instruction = match opcode {
@@ -137,7 +137,7 @@ pub fn disassemble_next_byte(cursor: &mut Cursor<Vec<u8>>) -> Result<(usize, Ins
     Ok((offset, instruction))
 }
 
-fn read_n_bytes(cursor: &mut Cursor<Vec<u8>>, n: usize) -> Result<Vec<u8>, Error> {
+fn read_n_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> Result<Vec<u8>, Error> {
     let mut buffer = vec![0; n];
     cursor.read_exact(&mut buffer)?;
     Ok(buffer)
