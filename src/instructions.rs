@@ -371,7 +371,7 @@ impl Instruction {
         }
     }
 
-    pub fn push(&self) -> usize {
+    pub fn pushes(&self) -> usize {
         match self {
             Self::Stop
             | Self::CallDataCopy
