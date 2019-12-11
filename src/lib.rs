@@ -80,6 +80,6 @@ mod tests {
         };
 
         assert_eq!(disassemble_hex_str(program).unwrap(), disas);
-        assert_eq!(disassemble_bytes(program_bytes), disas);
+        assert_eq!(disassemble_bytes(&program_bytes), disas);
     }
 }
