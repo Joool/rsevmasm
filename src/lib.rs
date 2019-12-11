@@ -43,7 +43,7 @@ impl Disassembly {
     }
 }
 
-fn disassemble_hex_str(input: &str) -> Result<HashMap<usize, Instruction>, hex::FromHexError> {
+fn disassemble_hex_str(input: &str) -> Result<BTreeMap<usize, Instruction>, hex::FromHexError> {
     let input = if input[0..2] == *"0x" {
         &input[2..]
     } else {
@@ -52,8 +52,8 @@ fn disassemble_hex_str(input: &str) -> Result<HashMap<usize, Instruction>, hex::
     hex::decode(input).map(|bytes| disassemble_bytes(&bytes))
 }
 
-fn disassemble_bytes(bytes: &[u8]) -> HashMap<usize, Instruction> {
-    let mut instructions = HashMap::new();
+fn disassemble_bytes(bytes: &[u8]) -> BTreeMap<usize, Instruction> {
+    let mut instructions = BTreeMap::new();
     let mut cursor = Cursor::new(bytes);
     while let Ok((offset, instruction)) = disassemble_next_byte(&mut cursor) {
         instructions.insert(offset, instruction);
@@ -66,18 +66,19 @@ fn disassemble_bytes(bytes: &[u8]) -> HashMap<usize, Instruction> {
 mod tests {
     use super::*;
     use maplit::hashmap;
+    use std::iter::FromIterator;
 
     #[test]
     fn simple_programm() {
         let program = "0x608040526002610100";
         let program_bytes = vec![0x60, 0x80, 0x40, 0x52, 0x60, 0x02, 0x61, 0x01, 0x00];
-        let disas = hashmap! {
+        let disas = BTreeMap::from_iter(hashmap! {
             0 => Instruction::Push(vec!(0x80)),
             2 => Instruction::Blockhash,
             3 => Instruction::MStore,
             4 => Instruction::Push(vec!(0x2)),
             6 => Instruction::Push(vec!(0x1, 0x00)),
-        };
+        });
 
         assert_eq!(disassemble_hex_str(program).unwrap(), disas);
         assert_eq!(disassemble_bytes(&program_bytes), disas);
