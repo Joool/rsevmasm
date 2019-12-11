@@ -22,6 +22,7 @@ use instructions::disassemble_next_byte;
 
 pub use instructions::Instruction;
 
+#[derive(Clone, Debug)]
 pub struct Disassembly {
     pub instructions: HashMap<usize, Instruction>,
 }
