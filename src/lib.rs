@@ -11,15 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+mod error;
 pub mod instructions;
 
 use hex;
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
-use instructions::disassemble_next_byte;
+use instructions::{assemble_instruction, disassemble_next_byte};
 
+pub use error::DisassemblyError;
 pub use instructions::Instruction;
 
 #[derive(Clone, Debug)]
@@ -28,12 +29,12 @@ pub struct Disassembly {
 }
 
 impl Disassembly {
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        let instructions = disassemble_bytes(bytes);
-        Self { instructions }
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, DisassemblyError> {
+        let instructions = disassemble_bytes(bytes)?;
+        Ok(Self { instructions })
     }
 
-    pub fn from_hex_str(input: &str) -> Result<Self, hex::FromHexError> {
+    pub fn from_hex_str(input: &str) -> Result<Self, DisassemblyError> {
         let instructions = disassemble_hex_str(input)?;
         Ok(Self { instructions })
     }
@@ -43,29 +44,48 @@ impl Disassembly {
     }
 }
 
-fn disassemble_hex_str(input: &str) -> Result<BTreeMap<usize, Instruction>, hex::FromHexError> {
+pub fn assemble_instructions(disassembly: Vec<Instruction>) -> Vec<u8> {
+    let mut result = Vec::new();
+    for disas in disassembly {
+        result.extend(assemble_instruction(disas));
+    }
+    result
+}
+
+fn disassemble_hex_str(input: &str) -> Result<BTreeMap<usize, Instruction>, DisassemblyError> {
     let input = if input[0..2] == *"0x" {
         &input[2..]
     } else {
         input
     };
-    hex::decode(input).map(|bytes| disassemble_bytes(&bytes))
+    let bytes = hex::decode(input)?;
+    disassemble_bytes(&bytes)
 }
 
-fn disassemble_bytes(bytes: &[u8]) -> BTreeMap<usize, Instruction> {
+fn disassemble_bytes(bytes: &[u8]) -> Result<BTreeMap<usize, Instruction>, DisassemblyError> {
     let mut instructions = BTreeMap::new();
     let mut cursor = Cursor::new(bytes);
-    while let Ok((offset, instruction)) = disassemble_next_byte(&mut cursor) {
-        instructions.insert(offset, instruction);
+    loop {
+        let result = disassemble_next_byte(&mut cursor);
+        match result {
+            Err(DisassemblyError::IOError(..)) => break,
+            Ok((offset, instruction)) => {
+                instructions.insert(offset, instruction);
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        }
     }
 
-    instructions
+    Ok(instructions)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use maplit::hashmap;
+    use quickcheck::{quickcheck, TestResult};
     use std::iter::FromIterator;
 
     #[test]
@@ -81,6 +101,38 @@ mod tests {
         });
 
         assert_eq!(disassemble_hex_str(program).unwrap(), disas);
-        assert_eq!(disassemble_bytes(&program_bytes), disas);
+        assert_eq!(disassemble_bytes(&program_bytes).unwrap(), disas);
+    }
+
+    fn disassemble_assemble(xs: &Vec<u8>) -> Result<Vec<u8>, DisassemblyError> {
+        let rev = disassemble_bytes(xs);
+        let rev: Vec<_> = rev?.values().cloned().collect();
+        Ok(assemble_instructions(rev))
+    }
+
+    fn disassemble_assemble_is_same(xs: Vec<u8>) -> TestResult {
+        match disassemble_assemble(&xs) {
+            Ok(rev) => TestResult::from_bool(xs == rev),
+            Err(..) => TestResult::discard(),
+        }
+    }
+
+    #[test]
+    fn fuzz_test() {
+        quickcheck(disassemble_assemble_is_same as fn(Vec<u8>) -> TestResult);
+    }
+
+    #[test]
+    fn regression_97_0_0() {
+        let vec = vec![97, 0, 0];
+        assert_eq!(disassemble_assemble(&vec), Ok(vec));
+    }
+
+    #[test]
+    fn regression_96() {
+        assert_eq!(
+            disassemble_assemble(&vec![96]),
+            Err(DisassemblyError::TooFewBytesForPush)
+        );
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "rsevmasm"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["Joel Frank <joel.frank@rub.de>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -20,3 +20,4 @@ hex = "0.4"
 
 [dev-dependencies]
 maplit = "1.0"
+quickcheck = "0.9"

@@ -12,9 +12,104 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{Cursor, Error, Read};
+use crate::DisassemblyError;
+use std::io::{self, Cursor, Read};
 
-pub fn disassemble_next_byte(cursor: &mut Cursor<&[u8]>) -> Result<(usize, Instruction), Error> {
+pub fn assemble(disassembly: Vec<Instruction>) -> Vec<u8> {
+    let mut result = Vec::new();
+    for disas in disassembly {
+        result.extend(assemble_instruction(disas));
+    }
+    result
+}
+
+pub fn assemble_instruction(instruction: Instruction) -> Vec<u8> {
+    match instruction {
+        Instruction::Stop => vec![0x00],
+        Instruction::Add => vec![0x01],
+        Instruction::Mul => vec![0x02],
+        Instruction::Sub => vec![0x03],
+        Instruction::Div => vec![0x04],
+        Instruction::SDiv => vec![0x05],
+        Instruction::Mod => vec![0x06],
+        Instruction::SMod => vec![0x07],
+        Instruction::AddMod => vec![0x08],
+        Instruction::MulMod => vec![0x09],
+        Instruction::Exp => vec![0x0a],
+        Instruction::SignExtend => vec![0x0b],
+        Instruction::Lt => vec![0x10],
+        Instruction::Gt => vec![0x11],
+        Instruction::SLt => vec![0x12],
+        Instruction::SGt => vec![0x13],
+        Instruction::EQ => vec![0x14],
+        Instruction::IsZero => vec![0x15],
+        Instruction::And => vec![0x16],
+        Instruction::Or => vec![0x17],
+        Instruction::Xor => vec![0x18],
+        Instruction::Not => vec![0x19],
+        Instruction::Byte => vec![0x1a],
+        Instruction::Shl => vec![0x1b],
+        Instruction::Shr => vec![0x1c],
+        Instruction::Sar => vec![0x1d],
+        Instruction::Sha3 => vec![0x20],
+        Instruction::Addr => vec![0x30],
+        Instruction::Balance => vec![0x31],
+        Instruction::Origin => vec![0x32],
+        Instruction::Caller => vec![0x33],
+        Instruction::CallValue => vec![0x34],
+        Instruction::CallDataLoad => vec![0x35],
+        Instruction::CallDataSize => vec![0x36],
+        Instruction::CallDataCopy => vec![0x37],
+        Instruction::CodeSize => vec![0x38],
+        Instruction::CodeCopy => vec![0x39],
+        Instruction::GasPrice => vec![0x3a],
+        Instruction::ExtCodeSize => vec![0x3b],
+        Instruction::ExtCodeCopy => vec![0x3c],
+        Instruction::ExtCodeHash => vec![0x3f],
+        Instruction::ReturnDataSize => vec![0x3d],
+        Instruction::ReturnDataCopy => vec![0x3e],
+        Instruction::Blockhash => vec![0x40],
+        Instruction::Coinbase => vec![0x41],
+        Instruction::Timestamp => vec![0x42],
+        Instruction::Number => vec![0x43],
+        Instruction::Difficulty => vec![0x44],
+        Instruction::GasLimit => vec![0x45],
+        Instruction::Pop => vec![0x50],
+        Instruction::MLoad => vec![0x51],
+        Instruction::MStore => vec![0x52],
+        Instruction::MStore8 => vec![0x53],
+        Instruction::SLoad => vec![0x54],
+        Instruction::SStore => vec![0x55],
+        Instruction::Jump => vec![0x56],
+        Instruction::JumpIf => vec![0x57],
+        Instruction::PC => vec![0x58],
+        Instruction::MSize => vec![0x59],
+        Instruction::Gas => vec![0x5a],
+        Instruction::JumpDest => vec![0x5b],
+        Instruction::Push(v) => {
+            let mut res = vec![0x60 + (v.len() as u8 - 1)];
+            res.extend(v);
+            res
+        }
+        Instruction::Dup(v) => vec![0x80 + v as u8],
+        Instruction::Swap(v) => vec![0x90 + v as u8],
+        Instruction::Log(v) => vec![0xa0 + v as u8],
+        Instruction::Create => vec![0xf0],
+        Instruction::Call => vec![0xf1],
+        Instruction::CallCode => vec![0xf2],
+        Instruction::Return => vec![0xf3],
+        Instruction::DelegateCall => vec![0xf4],
+        Instruction::Create2 => vec![0xfb],
+        Instruction::Revert => vec![0xfd],
+        Instruction::StaticCall => vec![0xfa],
+        Instruction::SelfDestruct => vec![0xff],
+        Instruction::Invalid => vec![0xfe],
+    }
+}
+
+pub fn disassemble_next_byte(
+    cursor: &mut Cursor<&[u8]>,
+) -> Result<(usize, Instruction), DisassemblyError> {
     let offset = cursor.position() as usize;
     let opcode = read_n_bytes(cursor, 1)?[0];
     let instruction = match opcode {
@@ -58,6 +153,7 @@ pub fn disassemble_next_byte(cursor: &mut Cursor<&[u8]>) -> Result<(usize, Instr
         0x3a => Instruction::GasPrice,
         0x3b => Instruction::ExtCodeSize,
         0x3c => Instruction::ExtCodeCopy,
+        0x3f => Instruction::ExtCodeHash,
         0x3d => Instruction::ReturnDataSize,
         0x3e => Instruction::ReturnDataCopy,
         0x40 => Instruction::Blockhash,
@@ -79,12 +175,16 @@ pub fn disassemble_next_byte(cursor: &mut Cursor<&[u8]>) -> Result<(usize, Instr
         0x5a => Instruction::Gas,
         0x5b => Instruction::JumpDest,
         0x60 | 0x61 | 0x62 | 0x63 | 0x64 | 0x65 | 0x66 | 0x67 | 0x68 | 0x69 | 0x6a | 0x6b
-        | 0x6c | 0x6d | 0x6e | 0x6f => {
-            Instruction::Push(read_n_bytes(cursor, 1 + (opcode & 0x0f) as usize)?)
-        }
+        | 0x6c | 0x6d | 0x6e | 0x6f => match read_n_bytes(cursor, 1 + (opcode & 0x0f) as usize) {
+            Err(..) => return Err(DisassemblyError::TooFewBytesForPush),
+            Ok(v) => Instruction::Push(v),
+        },
         0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79 | 0x7a | 0x7b
         | 0x7c | 0x7d | 0x7e | 0x7f => {
-            Instruction::Push(read_n_bytes(cursor, (0x11 + (opcode & 0x0f)) as usize)?)
+            match read_n_bytes(cursor, (0x11 + (opcode & 0x0f)) as usize) {
+                Err(..) => return Err(DisassemblyError::TooFewBytesForPush),
+                Ok(v) => Instruction::Push(v),
+            }
         }
         0x80 => Instruction::Dup(0),
         0x81 => Instruction::Dup(1),
@@ -132,12 +232,13 @@ pub fn disassemble_next_byte(cursor: &mut Cursor<&[u8]>) -> Result<(usize, Instr
         0xfd => Instruction::Revert,
         0xfa => Instruction::StaticCall,
         0xff => Instruction::SelfDestruct,
-        0xfe | _ => Instruction::Invalid,
+        0xfe => Instruction::Invalid,
+        _ => return Err(DisassemblyError::UnknownOpcode),
     };
     Ok((offset, instruction))
 }
 
-fn read_n_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> Result<Vec<u8>, Error> {
+fn read_n_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> Result<Vec<u8>, io::Error> {
     let mut buffer = vec![0; n];
     cursor.read_exact(&mut buffer)?;
     Ok(buffer)
