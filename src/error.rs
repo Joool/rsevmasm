@@ -54,3 +54,18 @@ impl std::convert::From<hex::FromHexError> for DisassemblyError {
         DisassemblyError::InvalidHexCharacter
     }
 }
+
+impl std::fmt::Display for DisassemblyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownOpcode => write!(f, "Encountered unknown opcode!"),
+            Self::IOError(err) => write!(f, "Encountered IO error: {}!", err),
+            Self::InvalidHexCharacter => write!(f, "Encountered invalid hex character!"),
+            Self::TooFewBytesForPush => {
+                write!(f, "Too few bytes availabe to parse push operation!")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DisassemblyError {}
