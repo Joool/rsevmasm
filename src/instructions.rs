@@ -232,8 +232,7 @@ pub fn disassemble_next_byte(
         0xfd => Instruction::Revert,
         0xfa => Instruction::StaticCall,
         0xff => Instruction::SelfDestruct,
-        0xfe => Instruction::Invalid,
-        _ => return Err(DisassemblyError::UnknownOpcode),
+        0xfe | _ => Instruction::Invalid,
     };
     Ok((offset, instruction))
 }
